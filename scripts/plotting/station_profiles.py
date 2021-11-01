@@ -67,9 +67,7 @@ def station_profiles(case_name, model_rgrid_loc, data_name, data_loc,
     plot_type = 'png'
 
     # Temporary test location
-    locations = [[30,90]]
-    test_site_lat = 30
-    test_site_lon = 90
+    locations = [[30,90],[0,25]]
 
     #Check if plot output directory exists, and if not, then create it:
     if not plot_loc.is_dir():
@@ -102,26 +100,37 @@ def station_profiles(case_name, model_rgrid_loc, data_name, data_loc,
             odata = oclim_ds[var].squeeze()  # squeeze in case of degenerate dimensions 
             mdata = mclim_ds[var].squeeze()
 
+            #                 
+            # Seasonal Averages
+            # Create new dictionaries:
+            mseasons = dict()
+            oseasons = dict()
+            dseasons = dict() # hold the differences
+
+
             # Check the dimensions in data, profiles only available for 3D fields
             has_lat, has_lev = pf.zm_validate_dims(mdata)
             if not has_lev:
                 print("{} has no lev (vertical) dimension... skipping profiles".format(var))
             else:
-                # Load time averaged profile at location
-                for loc in locations:
-                    tlat = loc[0]
-                    tlon = loc[1]
-                    plot_name = plot_loc / "{}_{}X{}Y_Station_Profile.{}".format(var,tlat,tlon,plot_type)
-                    print("plot_name={}".format(plot_name)) 
-                    print("mdata={}".format(mdata))
-                    prof_mdata = mdata.sel(lat=tlat,method="nearest").sel(lon=tlon,method="nearest").mean(dim='time')
-                    print("prof_mdata={}".format(prof_mdata))
-                    prof_odata = mdata.sel(lat=tlat,method="nearest").sel(lon=tlon,method="nearest").mean(dim='time')
-                    #Remove old plot, if it already exists
-                    if plot_name.is_file():
-                        plot_name.unlink()
-                    #Create New Plot
-                    plot_prof_and_save(plot_name, prof_mdata, prof_odata, var, tlat, tlon)
+                #Loop over season dictionary:
+                for s in seasons:
+                    mseasons[s] = mdata.sel(time=seasons[s]).mean(dim='time')
+                    oseasons[s] = odata.sel(time=seasons[s]).mean(dim='time')
+
+                    # Load time averaged profile at location
+                    for loc in locations:
+                        tlat = loc[0]
+                        tlon = loc[1]
+                        plot_name = plot_loc / "{}_{}_Profile_{}N{}E_Mean.{}".format(var,s,tlat,tlon,plot_type)
+                        prof_mdata = mseasons[s].sel(lat=tlat,method="nearest").sel(lon=tlon,method="nearest")
+                        prof_odata = oseasons[s].sel(lat=tlat,method="nearest").sel(lon=tlon,method="nearest")
+                        #Remove old plot, if it already exists
+                        if plot_name.is_file():
+                            plot_name.unlink()
+
+                        #Create New Plot
+                        plot_prof_and_save(plot_name, prof_mdata, prof_odata, var, tlat, tlon)
 
 
     #Notify user that script has ended:
@@ -147,15 +156,27 @@ def plot_prof_and_save(plot_name, mdlfld, obsfld, var, tlat, tlon, **kwargs):
 
     plt_title = "Tot Mean {} at {}lon {}lat".format(var, tlon, tlat)
 
-    fig, (ax1,ax2) = plt.subplots(1,2)
-    fig.suptitle(plt_title)
-    ax1.plot(mdlfld,mdlfld['lev'])
+    #fig, (ax1,ax2) = plt.subplots(1,2)
+    #fig.suptitle(plt_title)
+    #ax1.plot(mdlfld,mdlfld['lev'])
+    #ax1.invert_yaxis()
+    #ax2.plot(obsfld,obsfld['lev'])
+    #ax2.invert_yaxis()
+
+    if 'lev' in mdlfld.dims:
+        plt.plot(mdlfld,mdlfld['lev'], label="Test")
+        plt.plot(obsfld,obsfld['lev'], label="Baseline")
+    elif 'ilev' in mdlfld.dims:
+        plt.plot(mdlfld,mdlfld['ilev'], label="Test")
+        plt.plot(obsfld,obsfld['ilev'], label="Baseline")
+    
+    plt.legend()
+    plt.title(plt_title)
+    ax1 = plt.axes()
     ax1.invert_yaxis()
-    ax2.plot(obsfld,obsfld['lev'])
-    ax2.invert_yaxis()
 
     #Write the figure to provided workspace/file:                                                              
-    fig.savefig(plot_name, bbox_inches='tight', dpi=300)
+    plt.savefig(plot_name, bbox_inches='tight', dpi=300)
 
     #Close plots:                                                                                              
     plt.close()

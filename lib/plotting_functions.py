@@ -207,7 +207,14 @@ def lev_to_plev(data, ps, hyam, hybm, P0=100000., new_levels=None):
         pnew = [1000, 925, 850, 700, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, 10, 7, 5, 3, 2, 1]  # mandatory levels
     else:
         pnew = new_levels
-    data_interp = data.interp(lev=pnew)
+
+    if 'lev' in data.dims:
+        data_interp = data.interp(lev=pnew)
+    elif 'ilev' in data.dims:
+        data_interp = data.interp(ilev=pnew)
+    else:
+        data_interp = None
+ 
     return data_interp
 
 
@@ -215,7 +222,7 @@ def zonal_mean_xr(fld):
     """Average over all dimensions except `lev` and `lat`."""
     if isinstance(fld, xr.DataArray):
         d = fld.dims
-        davgovr = [dim for dim in d if dim not in ('lev','lat')]
+        davgovr = [dim for dim in d if dim not in ('lev','lat','ilev')]
     else:
         raise IOError("zonal_mean_xr requires Xarray DataArray input.")
     return fld.mean(dim=davgovr)
@@ -244,7 +251,7 @@ def zm_validate_dims(fld):
     if len(fld.dims) > 4:
         print(f"Sorry, too many dimensions: {fld.dims}")
         return None
-    has_lev = 'lev' in fld.dims
+    has_lev = 'lev' in fld.dims or 'ilev' in fld.dims
     has_lat = 'lat' in fld.dims
     if not has_lat:
         return None
@@ -277,7 +284,9 @@ def _zonal_plot_preslat(ax, lat, lev, data, **kwargs):
         cmap = kwargs.pop('cmap')
     else:
         cmap = 'Spectral_r'
-    img = ax.contourf(mlat, mlev, data.transpose('lat', "lev"), cmap=cmap, **kwargs)
+        img = ax.contourf(mlat, mlev, data.transpose(), cmap=cmap, **kwargs)
+        #img = ax.contourf(mlat, mlev, data.transpose('lat', "lev"), cmap=cmap, **kwargs)
+        
     minor_locator = mpl.ticker.FixedLocator(lev)
     ax.yaxis.set_minor_locator(minor_locator)
     ax.tick_params(which='minor', length=4, color='r')
@@ -293,6 +302,9 @@ def zonal_plot(lat, data, ax=None, **kwargs):
         ax = plt.gca()
     if 'lev' in data.dims:
         img, ax = _zonal_plot_preslat(ax, lat, data['lev'], data, **kwargs)
+        return img, ax
+    elif 'ilev' in data.dims:
+        img, ax = _zonal_plot_preslat(ax, lat, data['ilev'], data, **kwargs)
         return img, ax
     else:
         ax = _zonal_plot_line(ax, lat, data, **kwargs)

@@ -1065,7 +1065,7 @@ class CamDiag:
         season_order = ["ANN", "DJF", "MAM", "JJA", "SON"]
 
         #Set preferred order of plot types:
-        plot_type_order = ["LatLon", "Zonal"]
+        plot_type_order = ["LatLon", "Zonal", "Profile"]
 
         #Create new path object from user-specified plot directory path:
         plot_path = Path(plot_location)
